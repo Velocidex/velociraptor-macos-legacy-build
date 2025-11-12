@@ -135,6 +135,12 @@ func installPackageFromURL(url string, dst string) error {
 				return err
 			}
 
+		case tar.TypeSymlink:
+			err := os.Symlink(header.Linkname, target)
+			if err != nil {
+				return err
+			}
+
 		case tar.TypeReg:
 			fmt.Printf("Creating %v (%v bytes)\n", target, header.Size)
 			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
@@ -326,7 +332,7 @@ func Build() error {
 	}
 
 	fmt.Printf("Checking node version:\n")
-	err = sh.RunWithV(env, "which", "go")
+	err = sh.RunWithV(env, "which", "node")
 	if err != nil {
 		return err
 	}
