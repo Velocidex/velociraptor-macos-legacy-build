@@ -182,8 +182,9 @@ func maybeClone(dep DependencyGithub) error {
 		"--single-branch", "-b", branch, dep.Repo)
 }
 
-func copyOutput() error {
-	basepath, pattern := doublestar.SplitPattern("./output/velociraptor*")
+func copyOutput(toplevel string) error {
+	basepath, pattern := doublestar.SplitPattern(
+		toplevel + "/build/velociraptor/output/velociraptor*")
 	fsys := os.DirFS(basepath)
 	matches, err := doublestar.Glob(fsys, pattern)
 	if err != nil {
@@ -192,8 +193,11 @@ func copyOutput() error {
 
 	for _, match := range matches {
 		filename := filepath.Join(basepath, match)
+
+		fmt.Printf("Found output file %v\n", filename)
+
 		base := filepath.Base(filename)
-		dst := "../../output/" + base + "-legacy"
+		dst := toplevel + "/output/" + base + "-legacy"
 		fmt.Printf("Replacing %v in %v\n", filename, dst)
 		err := sh.Copy(dst, filename)
 		if err != nil {
@@ -209,11 +213,11 @@ func Build() error {
 		return err
 	}
 
-	cwd, err := os.Getwd()
+	toplevel, err := os.Getwd()
 	if err != nil {
 		return err
 	}
-	defer os.Chdir(cwd)
+	defer os.Chdir(toplevel)
 
 	err = os.Chdir("build")
 	if err != nil {
@@ -294,8 +298,8 @@ func Build() error {
 	}
 
 	env := make(map[string]string)
-	env["PATH"] = cwd + "/build/go/bin/:" +
-		cwd + "/build/node/bin/:" + os.Getenv("PATH")
+	env["PATH"] = toplevel + "/build/go/bin/:" +
+		toplevel + "/build/node/bin/:" + os.Getenv("PATH")
 	env["GOPATH"] = ""
 
 	fmt.Printf("Checking PATH: %v\n", env["PATH"])
@@ -303,7 +307,7 @@ func Build() error {
 	// Prevent automatic toolchain switching.
 	env["GOTOOLCHAIN"] = "local"
 
-	go_path := cwd + "/build/go/bin/go"
+	go_path := toplevel + "/build/go/bin/go"
 	env["MAGEFILE_GOCMD"] = go_path
 	env["MAGEFILE_PATH"] = env["PATH"]
 	env["MAGEFILE_VERBOSE"] = "1"
@@ -332,7 +336,7 @@ func Build() error {
 		}
 	}
 
-	err = copyOutput()
+	err = copyOutput(toplevel)
 	if err != nil {
 		return err
 	}
