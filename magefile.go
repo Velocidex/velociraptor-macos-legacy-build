@@ -326,6 +326,16 @@ func Build() error {
 	}
 
 	fmt.Printf("Checking node version:\n")
+	err = sh.RunWithV(env, "which", "go")
+	if err != nil {
+		return err
+	}
+
+	err = sh.RunWithV(env, "ls", "-l", toplevel+"/build/node/bin/")
+	if err != nil {
+		return err
+	}
+
 	err = sh.RunWithV(env, "node", "--version")
 	if err != nil {
 		return err
