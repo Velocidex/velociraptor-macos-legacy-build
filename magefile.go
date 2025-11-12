@@ -336,6 +336,11 @@ func Build() error {
 		return err
 	}
 
+	err = sh.RunWithV(env, toplevel+"/build/node/bin/node", "--version")
+	if err != nil {
+		return err
+	}
+
 	err = sh.RunWithV(env, "node", "--version")
 	if err != nil {
 		return err
