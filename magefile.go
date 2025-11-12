@@ -183,22 +183,25 @@ func maybeClone(dep DependencyGithub) error {
 }
 
 func copyOutput(toplevel string) error {
-	basepath, pattern := doublestar.SplitPattern(
-		toplevel + "/build/velociraptor/output/velociraptor*")
-	fsys := os.DirFS(basepath)
-	matches, err := doublestar.Glob(fsys, pattern)
+	err := os.MkdirAll("output", 0700)
+	if err != nil {
+		return err
+	}
+
+	basepath := toplevel + "/build/velociraptor/output/"
+	matches, err := os.ReadDir(basepath)
 	if err != nil {
 		return err
 	}
 
 	for _, match := range matches {
-		filename := filepath.Join(basepath, match)
+		filename := filepath.Join(basepath, match.Name())
 
 		fmt.Printf("Found output file %v\n", filename)
 
 		base := filepath.Base(filename)
 		dst := toplevel + "/output/" + base + "-legacy"
-		fmt.Printf("Replacing %v in %v\n", filename, dst)
+		fmt.Printf("Copying %v in %v\n", filename, dst)
 		err := sh.Copy(dst, filename)
 		if err != nil {
 			return err
