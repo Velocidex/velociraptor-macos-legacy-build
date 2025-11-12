@@ -62,9 +62,13 @@ var (
 	mutations = []mutation{
 		{From: "../patches/velociraptor/go.mod", To: "velociraptor/go.mod"},
 		{From: "../patches/velociraptor/go.sum", To: "velociraptor/go.sum"},
+		{From: "../patches/velociraptor/host_darwin_cgo.go",
+			To: "velociraptor/vql/psutils/host_darwin_cgo.go"},
 		{From: "../patches/etw/go.mod", To: "etw/go.mod"},
-		{From: "../patches/prefetch/go.mod", To: "go-prefetch/go.mod"},
-		{From: "../patches/json/validator.go", To: "velociraptor/tools/json/validator.go"},
+		{From: "../patches/prefetch/go.mod",
+			To: "go-prefetch/go.mod"},
+		{From: "../patches/json/validator.go",
+			To: "velociraptor/tools/json/validator.go"},
 	}
 )
 
