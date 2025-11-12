@@ -78,19 +78,20 @@ var (
 )
 
 func installGo() error {
-	return installPackageFromURL(golang_url[runtime.GOOS], "go")
+	return installPackageFromURL(golang_url[runtime.GOOS], "go", false)
 }
 
 func installNode() error {
-	return installPackageFromURL(node_url[runtime.GOOS], "node")
+	return installPackageFromURL(node_url[runtime.GOOS], "node", false)
 }
 
-func installPackageFromURL(url string, dst string) error {
+func installPackageFromURL(url string, dst string, verbose bool) error {
 	stat, err := os.Lstat(dst)
 	if err == nil && stat.Mode().IsDir() {
 		return nil
 	}
 
+	fmt.Printf("Download package from %v\n", url)
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
@@ -142,7 +143,9 @@ func installPackageFromURL(url string, dst string) error {
 			}
 
 		case tar.TypeReg:
-			fmt.Printf("Creating %v (%v bytes)\n", target, header.Size)
+			if verbose {
+				fmt.Printf("Creating %v (%v bytes)\n", target, header.Size)
+			}
 			f, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
 			if err != nil {
 				return err
@@ -343,11 +346,6 @@ func Build() error {
 	}
 
 	err = sh.RunWithV(env, toplevel+"/build/node/bin/node", "--version")
-	if err != nil {
-		return err
-	}
-
-	err = sh.RunWithV(env, "node", "--version")
 	if err != nil {
 		return err
 	}
