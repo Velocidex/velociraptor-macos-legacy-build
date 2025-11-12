@@ -51,8 +51,11 @@ var (
 	}
 
 	build_targets = map[string][]string{
-		"linux":  []string{"release"},
-		"darwin": []string{"release", "darwinm1"},
+		"linux": []string{
+			"UpdateDependentTools", "Assets", "Linux"},
+
+		"darwin": []string{
+			"UpdateDependentTools", "Assets", "Darwin", "DarwinM1"},
 	}
 
 	// Transform the codebase so it can build
@@ -170,10 +173,8 @@ func copyOutput() error {
 
 	for _, match := range matches {
 		filename := filepath.Join(basepath, match)
-		ext := filepath.Ext(filename)
-		bare := strings.TrimSuffix(filename, ext)
-		base := filepath.Base(bare)
-		dst := "../../output/" + base + "-legacy" + ext
+		base := filepath.Base(filename)
+		dst := "../../output/" + base + "-legacy"
 		fmt.Printf("Replacing %v in %v\n", filename, dst)
 		err := sh.Copy(dst, filename)
 		if err != nil {
