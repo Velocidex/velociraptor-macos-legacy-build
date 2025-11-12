@@ -183,7 +183,7 @@ func maybeClone(dep DependencyGithub) error {
 }
 
 func copyOutput(toplevel string) error {
-	err := os.MkdirAll("output", 0700)
+	err := os.MkdirAll(toplevel+"/output/", 0700)
 	if err != nil {
 		return err
 	}
@@ -199,8 +199,7 @@ func copyOutput(toplevel string) error {
 
 		fmt.Printf("Found output file %v\n", filename)
 
-		base := filepath.Base(filename)
-		dst := toplevel + "/output/" + base + "-legacy"
+		dst := toplevel + "/output/" + match.Name() + "-legacy"
 		fmt.Printf("Copying %v in %v\n", filename, dst)
 		err := sh.Copy(dst, filename)
 		if err != nil {
