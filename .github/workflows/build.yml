@@ -1,0 +1,34 @@
+# Only trigger when a PR is committed.
+name: Build Binaries
+
+# Make sure we can build on each pull request.
+on: [pull_request]
+
+jobs:
+  build:
+    name: Build
+    # We used to build on ubuntu-18.04 but that is now deprecated by
+    # GitHub. Earlier distributions will have to use the musl build.
+    runs-on: macos-latest
+    steps:
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+    - uses: actions/setup-go@93397bea11091df50f3d7e59dc26a7711a8bcfbe
+      with:
+        go-version: '^1.24.10'
+
+        # Caching seems to really slow down the build due to the time
+        # taken to save the cache.
+        cache: false
+
+    - run: go version
+    - name: Build All Architectures
+      run: |
+        make
+
+    - name: StoreBinaries
+      uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1
+      with:
+        name: Binaries
+        path: output

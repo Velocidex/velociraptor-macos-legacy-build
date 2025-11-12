@@ -50,30 +50,47 @@ var (
 		"darwin": "https://go.dev/dl/go1.24.10.darwin-arm64.tar.gz",
 	}
 
+	node_url = map[string]string{
+		"linux":  "https://nodejs.org/dist/v24.11.1/node-v24.11.1-linux-x64.tar.gz",
+		"darwin": "https://nodejs.org/dist/v24.11.1/node-v24.11.1-darwin-x64.tar.gz",
+	}
+
 	build_targets = map[string][]string{
-		"linux":  []string{"release"},
-		"darwin": []string{"release", "darwinm1"},
+		"linux": []string{
+			"UpdateDependentTools", "Assets", "Linux"},
+
+		"darwin": []string{
+			"UpdateDependentTools", "Assets", "Darwin", "DarwinM1"},
 	}
 
 	// Transform the codebase so it can build
 	mutations = []mutation{
 		{From: "../patches/velociraptor/go.mod", To: "velociraptor/go.mod"},
 		{From: "../patches/velociraptor/go.sum", To: "velociraptor/go.sum"},
+		{From: "../patches/velociraptor/host_darwin_cgo.go",
+			To: "velociraptor/vql/psutils/host_darwin_cgo.go"},
 		{From: "../patches/etw/go.mod", To: "etw/go.mod"},
-		{From: "../patches/prefetch/go.mod", To: "go-prefetch/go.mod"},
-		{From: "../patches/json/validator.go", To: "velociraptor/tools/json/validator.go"},
+		{From: "../patches/prefetch/go.mod",
+			To: "go-prefetch/go.mod"},
+		{From: "../patches/json/validator.go",
+			To: "velociraptor/tools/json/validator.go"},
 	}
 )
 
 func installGo() error {
-	dst := "go"
+	return installPackageFromURL(golang_url[runtime.GOOS], "go")
+}
 
+func installNode() error {
+	return installPackageFromURL(node_url[runtime.GOOS], "node")
+}
+
+func installPackageFromURL(url string, dst string) error {
 	stat, err := os.Lstat(dst)
 	if err == nil && stat.Mode().IsDir() {
 		return nil
 	}
 
-	url := golang_url[runtime.GOOS]
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
@@ -101,7 +118,12 @@ func installGo() error {
 			continue
 		}
 
-		target := filepath.Join(dst, header.Name)
+		// Remove the top level directory from the zip.
+		components := strings.Split(header.Name, "/")
+		if len(components) <= 1 {
+			continue
+		}
+		target := filepath.Join(dst, strings.Join(components[1:], "/"))
 
 		// check the file type
 		switch header.Typeflag {
@@ -160,21 +182,25 @@ func maybeClone(dep DependencyGithub) error {
 		"--single-branch", "-b", branch, dep.Repo)
 }
 
-func copyOutput() error {
-	basepath, pattern := doublestar.SplitPattern("./output/velociraptor*")
-	fsys := os.DirFS(basepath)
-	matches, err := doublestar.Glob(fsys, pattern)
+func copyOutput(toplevel string) error {
+	err := os.MkdirAll(toplevel+"/output/", 0700)
+	if err != nil {
+		return err
+	}
+
+	basepath := toplevel + "/build/velociraptor/output/"
+	matches, err := os.ReadDir(basepath)
 	if err != nil {
 		return err
 	}
 
 	for _, match := range matches {
-		filename := filepath.Join(basepath, match)
-		ext := filepath.Ext(filename)
-		bare := strings.TrimSuffix(filename, ext)
-		base := filepath.Base(bare)
-		dst := "../../output/" + base + "-legacy" + ext
-		fmt.Printf("Replacing %v in %v\n", filename, dst)
+		filename := filepath.Join(basepath, match.Name())
+
+		fmt.Printf("Found output file %v\n", filename)
+
+		dst := toplevel + "/output/" + match.Name() + "-legacy"
+		fmt.Printf("Copying %v in %v\n", filename, dst)
 		err := sh.Copy(dst, filename)
 		if err != nil {
 			return err
@@ -189,11 +215,11 @@ func Build() error {
 		return err
 	}
 
-	cwd, err := os.Getwd()
+	toplevel, err := os.Getwd()
 	if err != nil {
 		return err
 	}
-	defer os.Chdir(cwd)
+	defer os.Chdir(toplevel)
 
 	err = os.Chdir("build")
 	if err != nil {
@@ -201,6 +227,11 @@ func Build() error {
 	}
 
 	err = installGo()
+	if err != nil {
+		return err
+	}
+
+	err = installNode()
 	if err != nil {
 		return err
 	}
@@ -269,20 +300,33 @@ func Build() error {
 	}
 
 	env := make(map[string]string)
-	env["PATH"] = "../go/go/bin/:" + os.Getenv("PATH")
+	env["PATH"] = toplevel + "/build/go/bin/:" +
+		toplevel + "/build/node/bin/:" + os.Getenv("PATH")
 	env["GOPATH"] = ""
+
+	fmt.Printf("Checking PATH: %v\n", env["PATH"])
 
 	// Prevent automatic toolchain switching.
 	env["GOTOOLCHAIN"] = "local"
 
-	go_path, err := filepath.Abs("../go/go/bin/go")
+	go_path := toplevel + "/build/go/bin/go"
+	env["MAGEFILE_GOCMD"] = go_path
+	env["MAGEFILE_PATH"] = env["PATH"]
+	env["MAGEFILE_VERBOSE"] = "1"
+
+	fmt.Printf("Checking go version:\n")
+	err = sh.RunWithV(env, "which", "go")
 	if err != nil {
 		return err
 	}
-	env["MAGEFILE_GOCMD"] = go_path
-	env["MAGEFILE_VERBOSE"] = "1"
 
-	err = sh.RunWithV(env, go_path, "version")
+	err = sh.RunWithV(env, "go", "version")
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Checking node version:\n")
+	err = sh.RunWithV(env, "node", "--version")
 	if err != nil {
 		return err
 	}
@@ -294,7 +338,7 @@ func Build() error {
 		}
 	}
 
-	err = copyOutput()
+	err = copyOutput(toplevel)
 	if err != nil {
 		return err
 	}
