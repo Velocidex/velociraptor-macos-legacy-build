@@ -50,6 +50,11 @@ var (
 		"darwin": "https://go.dev/dl/go1.24.10.darwin-arm64.tar.gz",
 	}
 
+	node_url = map[string]string{
+		"linux":  "https://nodejs.org/dist/v24.11.1/node-v24.11.1-linux-x64.tar.gz",
+		"darwin": "https://nodejs.org/dist/v24.11.1/node-v24.11.1-darwin-x64.tar.gz",
+	}
+
 	build_targets = map[string][]string{
 		"linux": []string{
 			"UpdateDependentTools", "Assets", "Linux"},
@@ -73,14 +78,19 @@ var (
 )
 
 func installGo() error {
-	dst := "go"
+	return installPackageFromURL(golang_url[runtime.GOOS], "go")
+}
 
+func installNode() error {
+	return installPackageFromURL(node_url[runtime.GOOS], "node")
+}
+
+func installPackageFromURL(url string, dst string) error {
 	stat, err := os.Lstat(dst)
 	if err == nil && stat.Mode().IsDir() {
 		return nil
 	}
 
-	url := golang_url[runtime.GOOS]
 	resp, err := http.Get(url)
 	if err != nil {
 		return err
@@ -108,7 +118,12 @@ func installGo() error {
 			continue
 		}
 
-		target := filepath.Join(dst, header.Name)
+		// Remove the top level directory from the zip.
+		components := strings.Split(header.Name, "/")
+		if len(components) <= 1 {
+			continue
+		}
+		target := filepath.Join(dst, strings.Join(components[1:], "/"))
 
 		// check the file type
 		switch header.Typeflag {
@@ -210,6 +225,11 @@ func Build() error {
 		return err
 	}
 
+	err = installNode()
+	if err != nil {
+		return err
+	}
+
 	for _, dep := range deps {
 		err = maybeClone(dep)
 		if err != nil {
@@ -274,20 +294,33 @@ func Build() error {
 	}
 
 	env := make(map[string]string)
-	env["PATH"] = "../go/go/bin/:" + os.Getenv("PATH")
+	env["PATH"] = cwd + "/build/go/bin/:" +
+		cwd + "/build/node/bin/:" + os.Getenv("PATH")
 	env["GOPATH"] = ""
+
+	fmt.Printf("Checking PATH: %v\n", env["PATH"])
 
 	// Prevent automatic toolchain switching.
 	env["GOTOOLCHAIN"] = "local"
 
-	go_path, err := filepath.Abs("../go/go/bin/go")
+	go_path := cwd + "/build/go/bin/go"
+	env["MAGEFILE_GOCMD"] = go_path
+	env["MAGEFILE_PATH"] = env["PATH"]
+	env["MAGEFILE_VERBOSE"] = "1"
+
+	fmt.Printf("Checking go version:\n")
+	err = sh.RunWithV(env, "which", "go")
 	if err != nil {
 		return err
 	}
-	env["MAGEFILE_GOCMD"] = go_path
-	env["MAGEFILE_VERBOSE"] = "1"
 
-	err = sh.RunWithV(env, go_path, "version")
+	err = sh.RunWithV(env, "go", "version")
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Checking node version:\n")
+	err = sh.RunWithV(env, "node", "--version")
 	if err != nil {
 		return err
 	}
