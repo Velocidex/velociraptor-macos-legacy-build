@@ -52,7 +52,7 @@ var (
 
 	node_url = map[string]string{
 		"linux":  "https://nodejs.org/dist/v24.11.1/node-v24.11.1-linux-x64.tar.gz",
-		"darwin": "https://nodejs.org/dist/v24.11.1/node-v24.11.1-darwin-arm64.tar.gz",
+		"darwin": "https://nodejs.org/dist/v22.19.0/node-v22.19.0-darwin-arm64.tar.gz",
 	}
 
 	build_targets = map[string][]string{
